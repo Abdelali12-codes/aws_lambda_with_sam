@@ -1,0 +1,55 @@
+Transform: AWS::Serverless-2016-10-31
+Resources:
+ HelloLambdaFuction:
+  Type: AWS::Serverless::Function
+  DependsOn: MyMountTarget        # This is needed if an AWS::EFS::MountTarget resource is declared for EFS
+  Properties:
+    Handler: index.handler
+    Runtime: python3.6
+    InlineCode: |
+      def handler(event, context):
+        print("Hello, world!")
+    ReservedConcurrentExecutions: 30
+    Layers:
+      - Ref: MyLayer
+    Tracing: Active
+    Timeout: 120
+    FileSystemConfigs:
+      - Arn: !Ref MyEfsFileSystem
+        LocalMountPath: /mnt/EFS
+    Policies:
+      - AWSLambdaExecute
+      - Version: '2012-10-17' 
+        Statement:
+          - Effect: Allow
+            Action:
+              - s3:GetObject
+              - s3:GetObjectACL
+            Resource: 'arn:aws:s3:::my-bucket/*'
+    EventInvokeConfig:
+      MaximumEventAgeInSeconds: 60
+      MaximumRetryAttempts: 2
+      DestinationConfig:
+        OnSuccess:
+          Type: SQS
+          Destination: arn:aws:sqs:us-west-2:012345678901:my-queue
+        OnFailure:
+          Type: Lambda
+          Destination: !GetAtt DestinationLambda.Arn
+    Events:
+      ApiEvent:
+        Type: Api
+        Properties:
+          Path: /path
+          Method: get
+
+
+
+
+
+
+
+
+
+
+

@@ -1,0 +1,63 @@
+Transform: AWS::Serverless-2016-10-31
+Resources:
+  VPC:
+    Type: AWS::EC2::VPC
+    Properties:
+      CidrBlock: 10.0.0.0/16
+  Subnet1:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId:
+        Ref: VPC
+      CidrBlock: 10.0.1.0/24
+      AvailabilityZone: "us-west-2a"
+  EfsSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      VpcId:
+        Ref: VPC
+      GroupDescription: "mnt target sg"
+      SecurityGroupIngress:
+      - IpProtocol: -1
+        CidrIp: "0.0.0.0/0"
+  FileSystem:
+    Type: AWS::EFS::FileSystem
+    Properties:
+      PerformanceMode: generalPurpose
+  AccessPoint:
+    Type: AWS::EFS::AccessPoint
+    Properties:
+      FileSystemId:
+        Ref: FileSystem
+      PosixUser:
+        Uid: "1001"
+        Gid: "1001"
+      RootDirectory:
+        CreationInfo:
+          OwnerGid: "1001"
+          OwnerUid: "1001"
+          Permissions: "755"
+  MountTarget1:
+    Type: AWS::EFS::MountTarget
+    Properties:
+      FileSystemId:
+        Ref: FileSystem
+      SubnetId:
+        Ref: Subnet1
+      SecurityGroups:
+      - Ref: EfsSecurityGroup
+  MyFunctionWithEfs:
+    Type: AWS::Serverless::Function
+    Properties:
+      Handler: index.handler
+      Runtime: python3.9
+      VpcConfig:
+        SecurityGroupIds:
+        - Ref: EfsSecurityGroup
+        SubnetIds:
+        - Ref: Subnet1
+      FileSystemConfigs:
+      - Arn: !GetAtt AccessPoint.Arn
+        LocalMountPath: "/mnt/efs"
+      Description: Use a file system.
+    DependsOn: "MountTarget1" 
